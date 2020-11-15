@@ -1,0 +1,152 @@
+---
+title: "Bayesian networks"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, fig.width = 12, fig.height = 12, fig.align = 'center')
+
+### Load support packages
+if (!require(ggplot2)) install.packages("ggplot2")
+if (!require(deal)) install.packages("deal",repos="http://lib.stat.cmu.edu/R/CRAN",dependencies=TRUE)
+library("ggplot2")
+library("deal")
+load('data.RData')
+
+# plotting BN
+plot.bn <- function(BN, file=NULL) {
+  par(mar=c(0,0,0,0))
+  plot(BN, cexscale=13, unitscale=27, arrowlength=0.1, xr=c(0, 350), yr=c(20,370))
+  if (!is.null(file)) {
+    plt <- recordPlot()	
+    pdf(file)
+    replayPlot(plt)
+    dev.off()
+  }
+}
+
+# plots edges frequencies
+plot_edges_df = function(edges_df) {
+  g = ggplot(edges_df, aes(x=name, y=freq)) + geom_bar(stat="identity") +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  return(g)
+}
+```
+
+## 1
+
+10 most variant genes:
+
+```{r}
+names(genes)  # print selected genes
+```
+
+## 2
+
+Prior structure:
+
+```{r}
+plot.bn(G0)
+```
+
+## 3
+
+Local probability distributions:
+
+```{r}
+localprob(G0)
+```
+
+Local probability distribution for gene YBR088C:
+
+```{r}
+localprob(G0)$YBR088C
+```
+
+## 4
+
+```{r echo=TRUE, eval=FALSE}
+prior0 <- jointprior(G0, 5)  # equivalent to imaginary sample size = 5
+```
+
+## 5
+
+Initial BN score:
+
+```{r}
+print(G1$score)
+```
+
+## 6
+
+BN* network:
+
+```{r}
+plot.bn(BN)
+```
+
+BN* score:
+
+```{r}
+print(BN$score)
+```
+
+## 7
+
+Genes variances:
+
+```{r}
+print(genes.vars)
+```
+
+## 8
+
+```{r eval=FALSE, echo=TRUE}
+# perturbed data
+perturbed_data = list()
+for (i in 1:30) {
+  p_genes = data.frame(genes)
+  for (gene in colnames(p_genes)) {
+    p_genes[gene] = p_genes[gene] + rnorm(nrow(p_genes), mean=0, sd=sqrt(genes.vars[gene] / 10))
+  }
+  perturbed_data[[i]] = p_genes
+}
+```
+
+## 9
+
+```{r fig.height=8}
+ggplot(yhr143w.melted, aes(x=variable, y=value)) + geom_boxplot() + labs(x = 'experiment', y = 'empirical distribution')
+```
+
+## 10
+
+PBN5 network:
+
+```{r}
+plot.bn(p_networks[[5]])
+```
+
+## 11
+
+```{r fig.height=8}
+plot_edges_df(BN_edges_df)
+```
+
+Spurious edges of BN*:
+
+```{r}
+print(BN_edges_df[BN_edges_df$freq < 0.5,])
+```
+
+## 12
+
+```{r fig.height=8}
+plot_edges_df(not_BN_edges_df)
+```
+
+Edges that might be missing in BN*:
+
+```{r}
+print(not_BN_edges_df[not_BN_edges_df$freq >= 0.33,])
+```

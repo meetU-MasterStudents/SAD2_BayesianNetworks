@@ -13,6 +13,11 @@ library("deal")
 library("yeastCC")
 library("VGAM")
 
+### Load support packages
+install.packages("ggplot2")
+library("reshape2")
+library("ggplot2")
+
 #
 # 1) Data Preprocessing
 #
@@ -88,7 +93,7 @@ head(expr)
 # by clicking on node i and then on the background.,
 # Finish by clicking the center button 'Stop'.
 G0  <- network(expr, specifygraph=TRUE, inspectprob=TRUE)
-
+plot(G0)
 
 # We don't want any arrows starting from the "dummy" node, thus we construct a list of banned dependencies:
 banlist(G0) <- matrix(c(11,11,11,11,11,11,11,11,11,11,1,2,3,4,5,6,7,8,9,10),ncol=2)
@@ -131,41 +136,42 @@ plot.bn <- function(BN, file=NULL) {
   }
 }
 BN <- build.optimal.network(expr)
-plot(BN)
-plot.bn(BN, file="p_BNstar5.pdf")
+plot.bn(BN)
 
+# genes variables
 genes = within(expr, rm(dummy))
 genes.vars = sapply(genes, var)
 
+# perturbed data
 perturbed_data = list()
 for (i in 1:30) {
   p_genes = data.frame(genes)
   for (gene in colnames(p_genes)) {
-    p_genes[gene] = p_genes[gene] + rnorm(nrow(p_genes), mean=0, sd=genes.vars[gene] / 10)
+    p_genes[gene] = p_genes[gene] + rnorm(nrow(p_genes), mean=0, sd=sqrt(genes.vars[gene] / 10))
   }
   perturbed_data[[i]] = p_genes
 }
 
-library(reshape2)
-library(ggplo2)
-
+# plot YHR143W perturbed data
 yhr143w = t(sapply(perturbed_data, function(x) x$YHR143W))
 yhr143w = data.frame(yhr143w)
 colnames(yhr143w) = 1:77
 yhr143w.melted = melt(yhr143w)
-ggplot(yhr143w.melted, aes(x=variable, y=value)) + geom_boxplot()
+ggplot(yhr143w.melted, aes(x=variable, y=value)) + geom_boxplot() + labs(x = 'experiment', y = 'empirical distribution')
 
+# add dummies
 for (i in 1:30) {
   perturbed_data[[i]]$dummy = factor(rep("1", nrow(perturbed_data[[i]])))
 }
 
+# optimal networks on perturbed data
 p_networks = list()
 for (i in 1:30) {
   p_networks[[i]] = build.optimal.network(perturbed_data[[i]])
 }
 plot(p_networks[[5]])
-plot.bn(p_networks[[5]], file="PBN5.pdf")
 
+# get edges from network
 get_edges = function(network) {
   edges = list()
   i = 1
@@ -178,6 +184,7 @@ get_edges = function(network) {
   return(edges)
 }
 
+# get edges frequencies in data as dataframe
 df_edges_freqs = function(net, edges, all_edges) {
   edges_freqs = list()
   for (edge in edges) {
@@ -202,12 +209,14 @@ df_edges_freqs = function(net, edges, all_edges) {
   return(edges_df)
 }
 
+# plots edges frequencies
 plot_edges_df = function(edges_df) {
   g = ggplot(edges_df, aes(x=name, y=freq)) + geom_bar(stat="identity") +
     theme(axis.text.x = element_text(angle = 45, hjust = 1))
   return(g)
 }
 
+# edges in BN* network
 BN_edges = get_edges(BN)
 p_networks_edges = list()
 for (i in 1:30) {
@@ -218,9 +227,13 @@ BN_edges_df = df_edges_freqs(BN, BN_edges, p_networks_edges)
 BN_edges_df[BN_edges_df$freq < 0.5,]
 plot_edges_df(BN_edges_df)
 
+# edges not in BN* network
 unique_edges = p_networks_edges[!duplicated(p_networks_edges)]
 unique_edges_wo_BN = setdiff(unique_edges, BN_edges)
 
-not_BN_edges_df = plot_edges_freqs(BN, unique_edges_wo_BN, p_networks_edges)
+not_BN_edges_df = df_edges_freqs(BN, unique_edges_wo_BN, p_networks_edges)
 not_BN_edges_df[not_BN_edges_df$freq >= 0.33,]
 plot_edges_df(not_BN_edges_df)
+
+# save data for report
+save.image('data.RData')
